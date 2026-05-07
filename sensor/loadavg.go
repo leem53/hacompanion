@@ -3,9 +3,8 @@ package sensor
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
+
+	"github.com/shirou/gopsutil/v4/load"
 
 	"hacompanion/entity"
 	"hacompanion/util"
@@ -18,36 +17,15 @@ func NewLoadAVG() *LoadAVG {
 }
 
 func (w LoadAVG) Run(ctx context.Context) (*entity.Payload, error) {
-	b, err := os.ReadFile("/proc/loadavg")
+	avg, err := load.AvgWithContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load.AvgWithContext failed: %w", err)
 	}
+
 	p := entity.NewPayload()
-	parts := strings.Fields(string(b))
-	if len(parts) < 3 {
-		return nil, fmt.Errorf("expected at least 3 values from /proc/loadavg, got only %d: %s", len(parts), string(b))
-	}
-	for index, load := range parts {
-		var float float64
-		if index <= 2 {
-			float, err = strconv.ParseFloat(load, 32)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse loadavg %s: %w", load, err)
-			}
-			float = util.RoundToTwoDecimals(float)
-		}
-		switch index {
-		case 0:
-			p.State = float
-		case 1:
-			p.Attributes["5m"] = float
-		case 2:
-			p.Attributes["15m"] = float
-		default:
-			// VSCodium is complaining that this break is ineffective
-			// (doesn't break out of outer loop?)
-			break
-		}
-	}
+	p.State = util.RoundToTwoDecimals(avg.Load1)
+	p.Attributes["5m"] = util.RoundToTwoDecimals(avg.Load5)
+	p.Attributes["15m"] = util.RoundToTwoDecimals(avg.Load15)
+
 	return p, nil
 }

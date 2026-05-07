@@ -3,12 +3,12 @@ package sensor
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 
+	"github.com/shirou/gopsutil/v4/host"
+
 	"hacompanion/entity"
+	"hacompanion/util"
 )
 
 type Uptime struct{}
@@ -18,26 +18,18 @@ func NewUptime() *Uptime {
 }
 
 func (u Uptime) Run(ctx context.Context) (*entity.Payload, error) {
-	b, err := os.ReadFile("/proc/uptime")
+	boot, err := host.BootTimeWithContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("host.BootTimeWithContext failed: %w", err)
 	}
-	return u.process(string(b))
-}
 
-func (u Uptime) process(output string) (*entity.Payload, error) {
+	start := time.Unix(int64(boot), 0)
+	uptimeSeconds := time.Since(start).Seconds()
+
 	p := entity.NewPayload()
-	parts := strings.Fields(output)
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("expected at least two values from /proc/uptime: %s", output)
-	}
-	seconds, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse seconds from /proc/uptime (%s): %w", output, err)
-	}
-
-	p.State = time.Now().Add(-time.Second * time.Duration(seconds)).Format(time.RFC3339)
-	p.Attributes["uptime_seconds"] = parts[0]
+	p.State = start.Format(time.RFC3339)
+	p.Attributes["boot_time"] = start.Format(time.RFC3339)
+	p.Attributes["uptime_seconds"] = util.RoundToTwoDecimals(uptimeSeconds)
 
 	return p, nil
 }

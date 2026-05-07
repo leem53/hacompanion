@@ -36,6 +36,7 @@ var sensorDefinitions = map[string]func(m entity.Meta) entity.SensorDefinition{
 			Runner:     func(meta entity.Meta) entity.Runner { return sensor.NewMemory() },
 			Icon:       "mdi:memory",
 			StateClass: "measurement",
+			Unit:       "GiB",
 		}
 	},
 	"power": func(_ entity.Meta) entity.SensorDefinition {
